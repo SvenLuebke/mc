@@ -73,6 +73,22 @@ static name_keymap_t command_names[] = {
     {"Delete", CK_Delete},
     {"MakeDir", CK_MakeDir},
     {"ChangeMode", CK_ChangeMode},
+#ifdef WITH_TABS
+    {"CreateTab", CK_CreateTab},
+    {"CloseTab", CK_CloseTab},
+    {"RenameTab", CK_RenameTab},
+    {"NextTab", CK_NextTab},
+    {"MoveTab", CK_MoveTab},
+    {"CopyTab", CK_CopyTab},
+    {"MoveTabLeft", CK_MoveTabLeft},
+    {"MoveTabRight", CK_MoveTabRight},
+    {"SwapTab", CK_SwapTab},
+    {"PreviousTab", CK_PreviousTab},
+    {"TabsOptions", CK_TabsOptions},
+    {"GoToTab", CK_GoToTab},
+    {"TabsSaveSession", CK_TabsSaveSession},
+    {"TabsRestoreSession", CK_TabsRestoreSession},
+#endif
     {"ChangeOwn", CK_ChangeOwn},
     {"ChangeOwnAdvanced", CK_ChangeOwnAdvanced},
 #ifdef ENABLE_EXT2FS_ATTR

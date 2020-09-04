@@ -458,6 +458,7 @@ else
 fi
 
 mc_SUBSHELL
+mc_TABS
 mc_BACKGROUND
 mc_EXT2FS_ATTR
 mc_VFS_CHECKS
@@ -722,6 +723,7 @@ Configuration:
   Mouse support:                  ${mouse_lib}
   X11 events support:             ${textmode_x11_support}
   With subshell support:          ${subshell}
+  With tabs support:              ${tabs}
   With background operations:     ${enable_background}
   With ext2fs attributes support: ${ext2fs_attr_msg}
   Internal editor:                ${edit_msg}

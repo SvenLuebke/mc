@@ -80,7 +80,11 @@
 
 #include "consaver/cons.saver.h"        /* cons_saver_pid */
 
+#include "log4c.h"
+
 /*** global variables ****************************************************************************/
+
+log4c_category_t* log4ccat = NULL;
 
 /*** file scope macro definitions ****************************************************************/
 
@@ -253,6 +257,13 @@ main (int argc, char *argv[])
     char *config_migrate_msg = NULL;
     int exit_code = EXIT_FAILURE;
 
+    if (log4c_init()){
+      fprintf (stderr, "log4c_init() failed\n");
+      return exit_code;
+    }
+
+    log4ccat = log4c_category_get("debug");
+    log4c_category_log(log4ccat, LOG4C_PRIORITY_INFO, "mc Started");
     mc_global.run_from_parent_mc = !check_sid ();
 
     mc_global.timer = mc_timer_new ();
@@ -560,6 +571,7 @@ main (int argc, char *argv[])
     mc_timer_destroy (mc_global.timer);
 
     (void) putchar ('\n');      /* Hack to make shell's prompt start at left of screen */
+    log4c_fini();
 
     return exit_code;
 }

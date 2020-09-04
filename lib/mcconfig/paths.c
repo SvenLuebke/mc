@@ -77,6 +77,9 @@ static const struct
 
     /* data */
     { "skins",                               &mc_data_str, MC_SKINS_DIR },
+#ifdef WITH_TABS
+    { "tabs.sessions",                         &mc_config_str, MC_TABS_SESSION_SUBDIR}, 
+#endif
     { "fish",                                &mc_data_str, FISH_PREFIX },
     { "ashrc",                               &mc_data_str, "ashrc" },
     { "bashrc",                              &mc_data_str, "bashrc" },

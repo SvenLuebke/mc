@@ -491,7 +491,7 @@ widget_erase (Widget * w)
   */
 
 gboolean
-widget_is_active (const void *w)
+widget_is_active (const Widget *w)
 {
     const WGroup *owner;
 

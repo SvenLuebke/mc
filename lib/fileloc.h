@@ -60,6 +60,9 @@
 #define MC_USERMENU_FILE        "menu"
 #define MC_TREESTORE_FILE       "Tree"
 #define MC_PANELS_FILE          "panels.ini"
+#ifdef WITH_TABS
+#define MC_TABS_SESSION_SUBDIR  "tabs.sessions"
+#endif
 #define MC_FHL_INI_FILE         "filehighlight.ini"
 
 #define MC_SKINS_DIR            "skins"

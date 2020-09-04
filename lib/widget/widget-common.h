@@ -210,7 +210,7 @@ void widget_set_size (Widget * w, int y, int x, int lines, int cols);
 void widget_selectcolor (Widget * w, gboolean focused, gboolean hotkey);
 cb_ret_t widget_draw (Widget * w);
 void widget_erase (Widget * w);
-gboolean widget_is_active (const void *w);
+gboolean widget_is_active (const Widget *w);
 gboolean widget_overlapped (const Widget * a, const Widget * b);
 void widget_replace (Widget * old, Widget * new);
 void widget_select (Widget * w);

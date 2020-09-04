@@ -150,6 +150,17 @@ panels_options_t panels_options = {
     .select_flags = SELECT_MATCH_CASE | SELECT_SHELL_PATTERNS
 };
 
+#ifdef WITH_TABS
+tabs_options_t tabs_options = {
+    .open_where = AFTER_CURRENT,
+    .hide_tabs = FALSE,
+    .restore_on_load = TRUE,
+    .sessions_folder = NULL,
+    .bar_position = TOP,
+    .highlight_current_tab = TRUE
+};
+#endif
+
 gboolean easy_patterns = TRUE;
 
 /* It true saves the setup when quitting */
@@ -228,6 +239,10 @@ GArray *macros_list;
 
 static char *profile_name = NULL;       /* ${XDG_CONFIG_HOME}/mc/ini */
 static char *panels_profile_name = NULL;        /* ${XDG_CACHE_HOME}/mc/panels.ini */
+
+#ifdef WITH_TABS
+static char *tabs_sessions_folder = NULL;       /*${XDG_CONFIG_HOME}/mc/tabs.sessions */
+#endif
 
 /* *INDENT-OFF* */
 static const struct
@@ -436,6 +451,18 @@ static const struct
     { "torben_fj_mode", &panels_options.torben_fj_mode },
     { NULL, NULL }
 };
+#ifdef WITH_TABS
+static const struct
+{
+    const char *opt_name;
+    gboolean *opt_addr;
+} tabs_ini_options[] = {
+    { "hide_tabs", &tabs_options.hide_tabs },
+    { "highlight_current_tab", &tabs_options.highlight_current_tab },
+    { "restore_on_load", &tabs_options.restore_on_load },
+    { NULL, NULL }
+};
+#endif
 /* *INDENT-ON* */
 
 /*** file scope functions ************************************************************************/
@@ -1093,7 +1120,17 @@ load_setup (void)
     }
 
     panels_profile_name = mc_config_get_full_path (MC_PANELS_FILE);
+#ifdef WITH_TABS
+    tabs_sessions_folder = mc_config_get_full_path (MC_TABS_SESSION_SUBDIR);
 
+    tabs_options.sessions_folder = tabs_sessions_folder;
+    //memcpy(tabs_options.sessions_folder, tabs_sessions_folder, strlen(tabs_sessions_folder) + 1);
+
+    if (!exist_file (tabs_sessions_folder))
+    {
+        mkdir (tabs_sessions_folder, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    }
+#endif
     mc_global.main_config = mc_config_init (profile, FALSE);
 
     if (!exist_file (panels_profile_name))
@@ -1104,6 +1141,9 @@ load_setup (void)
     load_config ();
     load_layout ();
     panels_load_options ();
+#ifdef WITH_TABS
+    tabs_load_options ();
+#endif
     load_panelize ();
 
     /* Load time formats */
@@ -1201,6 +1241,9 @@ save_setup (gboolean save_options, gboolean save_panel_options)
         save_config ();
         save_layout ();
         panels_save_options ();
+#ifdef WITH_TABS
+        tabs_save_options ();
+#endif
         save_panelize ();
         /* directory_history_save (); */
 
@@ -1256,6 +1299,9 @@ done_setup (void)
     g_free (mc_global.tty.setup_color_string);
     g_free (profile_name);
     g_free (panels_profile_name);
+#ifdef WITH_TABS
+    g_free (tabs_sessions_folder);
+#endif
     mc_config_deinit (mc_global.main_config);
     mc_config_deinit (mc_global.panels_config);
 
@@ -1544,4 +1590,45 @@ panel_save_setup (WPanel * panel, const char *section)
                         panel->user_mini_status);
 }
 
+#ifdef WITH_TABS
+/**
+  Load tabs options from [Tabs] section.
+*/
+void
+tabs_load_options (void)
+{
+    if (mc_config_has_group (mc_global.main_config, CONFIG_TABS_SECTION))
+    {
+        size_t i;
+
+        for (i = 0; tabs_ini_options[i].opt_name != NULL; i++)
+            *tabs_ini_options[i].opt_addr =
+                mc_config_get_bool (mc_global.main_config, CONFIG_TABS_SECTION,
+                                    tabs_ini_options[i].opt_name, *tabs_ini_options[i].opt_addr);
+
+        tabs_options.open_where = mc_config_get_int (mc_global.main_config, CONFIG_TABS_SECTION,
+                                                     "open_where", (int) tabs_options.open_where);
+
+        tabs_options.bar_position = mc_config_get_int (mc_global.main_config, CONFIG_TABS_SECTION,
+                                                       "bar_position",
+                                                       (int) tabs_options.bar_position);
+    }
+}
+
+void
+tabs_save_options (void)
+{
+    size_t i;
+
+    for (i = 0; tabs_ini_options[i].opt_name != NULL; i++)
+        mc_config_set_bool (mc_global.main_config, CONFIG_TABS_SECTION,
+                            tabs_ini_options[i].opt_name, *tabs_ini_options[i].opt_addr);
+
+    mc_config_set_int (mc_global.main_config, CONFIG_TABS_SECTION,
+                       "open_where", (int) tabs_options.open_where);
+
+    mc_config_set_int (mc_global.main_config, CONFIG_TABS_SECTION,
+                       "bar_position", (int) tabs_options.bar_position);
+}
+#endif
 /* --------------------------------------------------------------------------------------------- */

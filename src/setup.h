@@ -29,6 +29,23 @@ typedef enum
     QSEARCH_NUM
 } qsearch_mode_t;
 
+#ifdef WITH_TABS
+typedef enum
+{
+    BEFORE_CURRENT = 0,
+    AFTER_CURRENT = 1,
+    AT_END = 2,
+    AT_BEGINNING = 3,
+    TABS_NUM
+} tabs_open_t;
+
+typedef enum
+{
+    TOP = 0,
+    BOTTOM = 1,
+    POS_NUM
+} bar_position_t;
+#endif
 /*** structures declarations (and typedefs of structures)*****************************************/
 
 /* panels ini options; [Panels] section */
@@ -56,6 +73,18 @@ typedef struct
     gboolean torben_fj_mode;    /* If TRUE, use some usability hacks by Torben */
     panel_select_flags_t select_flags;  /* Select/unselect file flags */
 } panels_options_t;
+
+#ifdef WITH_TABS
+typedef struct
+{
+    tabs_open_t open_where;     /* Where to open a new tab */
+    gboolean hide_tabs;         /* If TRUE, hide the tabs when only one tab */
+    gboolean restore_on_load;   /* If TRUE, restore tabs when starting mc */
+    gboolean highlight_current_tab;     /* If TRUE, highlight with an * the current tab in the other panel */
+    char *sessions_folder;      /* If TRUE, restore tabs when starting mc */
+    bar_position_t bar_position;        /* Where to place the tabs bar */
+} tabs_options_t;
+#endif
 
 typedef struct macro_action_t
 {
@@ -101,6 +130,9 @@ extern gboolean file_op_compute_totals;
 extern gboolean editor_ask_filename_before_edit;
 
 extern panels_options_t panels_options;
+#ifdef WITH_TABS
+extern tabs_options_t tabs_options;
+#endif
 
 extern panel_view_mode_t startup_left_mode;
 extern panel_view_mode_t startup_right_mode;
@@ -158,6 +190,11 @@ void free_keymap_defs (void);
 
 void panel_load_setup (WPanel * panel, const char *section);
 void panel_save_setup (WPanel * panel, const char *section);
+
+#ifdef WITH_TABS
+void tabs_save_options (void);
+void tabs_load_options (void);
+#endif
 
 /*** inline functions ****************************************************************************/
 

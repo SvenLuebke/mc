@@ -79,6 +79,8 @@
 
 #include "panel.h"
 
+#include "../myLog.h"
+
 /*** global variables ****************************************************************************/
 
 /* The hook list for the select file function */
@@ -109,6 +111,9 @@ static const char *string_dot (file_entry_t *, int);
 
 mc_fhl_t *mc_filehighlight = NULL;
 
+#ifdef WITH_TABS
+GList *saved_tabs;
+#endif
 /*** file scope macro definitions ****************************************************************/
 
 #define NORMAL          0
@@ -399,8 +404,13 @@ format_item_free (format_item_t * format)
 static int
 panel_lines (const WPanel * p)
 {
+#ifdef WITH_TABS
+    /* 3 lines are: top frame, column header, botton frame */
+    return (CONST_WIDGET (p)->lines - 3 - (panels_options.show_mini_info ? 2 : 0) - (TABS_VISIBLE(p) ? (TABS_UP(p) ? TABS_UP_VLINES : TABS_BOTTOM_VLINES) : 0) );
+#else
     /* 3 lines are: top frame, column header, botton frame */
     return (CONST_WIDGET (p)->lines - 3 - (panels_options.show_mini_info ? 2 : 0));
+#endif
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -937,6 +947,9 @@ repaint_file (WPanel * panel, int file_index, gboolean mv, int attr, gboolean is
             ypos %= panel_lines (panel);
 
         ypos += 2;              /* top frame and header */
+#ifdef WITH_TABS
+        ypos += TABS_UP (panel) ? TABS_UP_VLINES : 0;
+#endif
         widget_gotoyx (w, ypos, offset + 1);
     }
 
@@ -988,7 +1001,11 @@ display_mini_info (WPanel * panel)
     if (!panels_options.show_mini_info)
         return;
 
+#ifdef WITH_TABS
+    widget_gotoyx (w, panel_lines (panel) + 3 + (TABS_UP (panel) ? TABS_UP_VLINES : 0), 1);
+#else
     widget_gotoyx (w, panel_lines (panel) + 3, 1);
+#endif
 
     if (panel->searching)
     {
@@ -1112,8 +1129,11 @@ mini_info_separator (const WPanel * panel)
     {
         const Widget *w = CONST_WIDGET (panel);
         int y;
-
+#ifdef WITH_TABS
+        y = panel_lines (panel) + 2 + (TABS_UP (panel) ? TABS_UP_VLINES : 0);
+#else
         y = panel_lines (panel) + 2;
+#endif
 
         tty_setcolor (NORMAL_COLOR);
         tty_draw_hline (w->y + y, w->x + 1, ACS_HLINE, w->cols - 2);
@@ -1264,14 +1284,17 @@ show_dir (const WPanel * panel)
     {
         int y;
 
+#ifdef WITH_TABS
+        y = panel_lines (panel) + 2 + (TABS_UP (panel) ? TABS_UP_VLINES : 0);
+#else
         y = panel_lines (panel) + 2;
-
+#endif
         widget_gotoyx (w, y, 0);
         tty_print_alt_char (ACS_LTEE, FALSE);
         widget_gotoyx (w, y, w->cols - 1);
         tty_print_alt_char (ACS_RTEE, FALSE);
     }
-
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "PanelLines %d ; TabsVisible: %d ; TabsUp: %d",CONST_WIDGET (panel)->lines, TABS_VISIBLE(panel), TABS_UP(panel));
     widget_gotoyx (w, 0, 1);
     tty_print_string (panel_history_prev_item_char);
 
@@ -1389,7 +1412,7 @@ adjust_top_file (WPanel * panel)
 
 /* --------------------------------------------------------------------------------------------- */
 /** add "#enc:encodning" to end of path */
-/* if path end width a previous #enc:, only encoding is changed no additional 
+/* if path end width a previous #enc:, only encoding is changed no additional
  * #enc: is appended
  * retun new string
  */
@@ -1471,6 +1494,9 @@ panel_destroy (WPanel * p)
 {
     size_t i;
 
+#ifdef WITH_TABS
+    destroy_tabs (p);
+#endif
     if (panels_options.auto_save_setup)
     {
         char *name;
@@ -1517,7 +1543,11 @@ panel_paint_sort_info (const WPanel * panel)
         char *str;
 
         str = g_strdup_printf ("%s%s", sort_sign, Q_ (panel->sort_field->hotkey));
+#ifdef WITH_TABS
+        widget_gotoyx (panel, 1 + (TABS_UP (panel) ? TABS_UP_VLINES : 0), 1);
+#else
         widget_gotoyx (panel, 1, 1);
+#endif
         tty_print_string (str);
         g_free (str);
     }
@@ -1557,7 +1587,7 @@ panel_print_header (const WPanel * panel)
     int i;
     GString *format_txt;
 
-    widget_gotoyx (w, 1, 1);
+    widget_gotoyx (w, 4, 1);
     tty_getyx (&y, &x);
     tty_setcolor (NORMAL_COLOR);
     tty_draw_hline (y, x, ' ', w->cols - 2);
@@ -1592,6 +1622,7 @@ panel_print_header (const WPanel * panel)
 
                 tty_setcolor (HEADER_COLOR);
                 tty_print_string (str_fit_to_term (format_txt->str, fi->field_len, J_CENTER_LEFT));
+                log4c(log4ccat, LOG4C_PRIORITY_INFO, "str: %s",format_txt->str);
             }
             else
             {
@@ -3651,6 +3682,10 @@ panel_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, void *d
         show_dir (panel);
         panel_print_header (panel);
         adjust_top_file (panel);
+#ifdef WITH_TABS
+        draw_tabs (get_other_type () != view_listing
+                   || get_current_type () != view_listing ? panel : NULL);
+#endif
         paint_dir (panel);
         mini_info_separator (panel);
         display_mini_info (panel);
@@ -3680,6 +3715,10 @@ panel_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, void *d
         bb = find_buttonbar (h);
         midnight_set_buttonbar (bb);
         widget_draw (WIDGET (bb));
+#ifdef WITH_TABS
+        draw_tabs (get_other_type () != view_listing
+                   || get_current_type () != view_listing ? panel : NULL);
+#endif
         return MSG_HANDLED;
 
     case MSG_UNFOCUS:
@@ -3816,6 +3855,10 @@ panel_mouse_is_on_item (const WPanel * panel, int y, int x)
 {
     int last;
 
+#ifdef WITH_TABS
+    y -= TABS_UP(panel) ? TABS_UP_VLINES : 0;
+#endif
+
     if (y < 0)
         return (-1);
 
@@ -3874,8 +3917,15 @@ panel_mouse_callback (Widget * w, mouse_msg_t msg, mouse_event_t * event)
             }
             break;
         }
-
+#ifdef WITH_TABS
+        else if (event->y == (TABS_UP(panel) ? TABS_UP_TABSVLINE : panel_lines(panel)+2))
+        {
+            process_tab_click(event->x);
+        }
+        else if (event->y == (TABS_UP(panel) ? (TABS_UP_VLINES+1) : 1))
+#else
         if (event->y == 1)
+#endif
         {
             /* sort on clicked column */
             mouse_sort_col (panel, event->x + 1);
@@ -4337,6 +4387,19 @@ panel_sized_empty_new (const char *panel_name, int y, int x, int lines, int cols
         section = g_strdup (panel->panel_name);
     }
     panel_load_setup (panel, section);
+#ifdef WITH_TABS
+    if (saved_tabs != NULL)
+    {
+        panel->tabs.list = saved_tabs;
+        panel->tabs.current = saved_tabs;
+        saved_tabs = NULL;
+    }
+    else
+    {
+        create_tab (panel, TABDIR_NEXT, NULL);
+    }
+    panel->tabs.do_not_delete = 0;
+#endif
     g_free (section);
 
     /* Load format strings */
@@ -5047,4 +5110,1255 @@ do_cd (const vfs_path_t * new_dir_vpath, enum cd_enum exact)
     return res;
 }
 
+#ifdef WITH_TABS
+/**
+ * Gets the new tabs direction from preferences
+ */
+TabsDirection_t get_new_tabs_direction ()
+{
+
+    if (tabs_options.open_where == BEFORE_CURRENT)
+    {
+        return TABDIR_PREV;
+    }
+    else if (tabs_options.open_where == AFTER_CURRENT)
+    {
+        return TABDIR_NEXT;
+    }
+    else if (tabs_options.open_where == AT_END)
+    {
+        return TABDIR_LAST;
+    }
+    else if (tabs_options.open_where == AT_BEGINNING)
+    {
+        return TABDIR_FIRST;
+    }
+
+    return TABDIR_LAST;
+}
+
+/**
+ * This function will create a new tab in the current panel
+ */
+void
+new_tab (WPanel * panel)
+{
+    TabsDirection_t d = get_new_tabs_direction ();
+    create_tab (panel, d, NULL);
+    change_tab (panel, d, NULL);
+    draw_tabs (panel);
+    panel->dirty = 1;
+}
+
+/**
+ * Copies the current tab from the current panel to the other Panel
+ */
+void
+copy_tab_to_other_panel (void)
+{
+    WPanel *opanel = (WPanel *) other_panel;
+    WPanel *cpanel = (WPanel *) current_panel;
+    Tab *tc, *to;
+    TabsDirection_t d = get_new_tabs_direction ();
+
+    tc = cpanel->tabs.current->data;
+    create_tab (opanel, d, NULL);
+    change_tab (opanel, d, NULL);
+    to = opanel->tabs.current->data;
+
+    if (tc->name != NULL)
+    {
+        to->name = g_new0 (char, strlen (tc->name) + 1);
+        strcpy (to->name, tc->name);
+    }
+    to->path = vfs_path_clone (cpanel->cwd_vpath);
+    do_panel_cd (opanel, to->path, cd_exact);
+    draw_tabs (opanel);
+}
+
+void
+swap_tabs (void)
+{
+    WPanel *panel1 = (WPanel *) other_panel;
+    WPanel *panel2 = (WPanel *) current_panel;
+    GList *b, *e, *d, *f;
+    // We consider the tabs on the current panel a, b, c
+    // and the tabs on the other panel d, e, f
+    // We try to change b and e.
+    // If we have only one tab on each panel, then we do switch panel.
+    // We have a special case if we have only one tab on only one of the panels.
+    // Then this algorithm will work if panel1 is the panel with only one tab
+    // If we changed the first tab of any of the panel, we have to also change the panel->tabs.list pointer
+
+    if (panel1->tabs.current->next == panel1->tabs.current
+        && panel2->tabs.current->next == panel2->tabs.current)
+    {
+        swap_panels ();
+        tty_touch_screen ();
+        repaint_screen ();
+        return;
+    }
+    else
+    {
+        if (panel2->tabs.current->next == panel2->tabs.current)
+        {
+            panel1 = (WPanel *) current_panel;
+            panel2 = (WPanel *) other_panel;
+        }
+    }
+
+    b = panel1->tabs.current;
+    ((Tab *) b->data)->path = vfs_path_clone (panel1->cwd_vpath);
+    e = panel2->tabs.current;
+    ((Tab *) e->data)->path = vfs_path_clone (panel2->cwd_vpath);
+    d = e->prev;
+    f = e->next;
+
+    if (b->prev != b)
+    {
+        b->prev->next = e;
+    }
+    e->next = b->next == b ? e : b->next;
+    if (b->next != b)
+    {
+        b->next->prev = e;
+    }
+    e->prev = b->prev == b ? e : b->prev;
+
+    d->next = b;
+    b->next = f;
+    f->prev = b;
+    b->prev = d;
+
+    panel1->tabs.current = e;
+    if (panel1->tabs.list == b)
+    {
+        panel1->tabs.list = e;
+    }
+    panel2->tabs.current = b;
+    if (panel2->tabs.list == e)
+    {
+        panel2->tabs.list = b;
+    }
+    do_panel_cd (panel1, ((Tab *) e->data)->path, cd_exact);
+    do_panel_cd (panel2, ((Tab *) b->data)->path, cd_exact);
+    change_panel ();
+    repaint_screen ();
+}
+
+/**
+ * Moves the current tab from the current panel to the other Panel
+ */
+void
+move_tab_to_other_panel (void)
+{
+    WPanel *opanel = (WPanel *) other_panel;
+    WPanel *cpanel = (WPanel *) current_panel;
+    Tab *t;
+    GList *i;
+    TabsDirection_t d = get_new_tabs_direction ();
+    int first_tab = 0;
+
+    if (cpanel->tabs.list->next == cpanel->tabs.list)
+    {
+        message (D_ERROR, MSG_ERROR, _("The current tab is the only one.\nYou cannot move it."));
+    }
+    else
+    {
+        if (cpanel->tabs.list == cpanel->tabs.current)
+        {
+            cpanel->tabs.list = cpanel->tabs.list->next;
+            first_tab = 1;
+        }
+        t = cpanel->tabs.current->data;
+        create_tab (opanel, d, (Tab *) t);
+        i = cpanel->tabs.current;
+        change_tab (cpanel, TABDIR_PREV, NULL);
+        i->prev->next = i->next;
+        i->next->prev = i->prev;
+        g_free (i);
+        i = opanel->tabs.current->next;
+        while (i != opanel->tabs.current)
+        {
+            if (i->data == t)
+            {
+                break;
+            }
+
+            i = i->next;
+        }
+        change_tab (opanel, TABDIR_ABSOLUTE, i);
+        change_panel ();
+        if (first_tab)
+        {
+            change_tab (cpanel, TABDIR_ABSOLUTE, cpanel->tabs.list);
+        }
+        repaint_screen ();
+    }
+}
+#endif
+/**
+ * This function will close a tab
+ * @return void
+ */
+void
+close_tab (WPanel * p)
+{
+    if (p->tabs.list->next == p->tabs.list)
+    {
+        message (D_ERROR, MSG_ERROR, _("The current tab is the only one.\nYou cannot close it."));
+    }
+    else
+    {
+        int first = p->tabs.current == p->tabs.list;
+        GList *b = p->tabs.current->prev;
+        GList *c = p->tabs.current;
+        GList *d = p->tabs.current->next;
+        change_tab (p, TABDIR_PREV, NULL);
+        b->next = d;
+        d->prev = b;
+
+        destroy_tab (c->data);
+        g_free (c);
+
+        if (first)
+        {
+            p->tabs.list = d;
+        }
+    }
+}
+
+/**
+ * This function renames a tab
+ * @return void
+ */
+void
+rename_tab (WPanel * p)
+{
+    Tab *t = (Tab *) p->tabs.current->data;
+    char *title = get_tab_title(p, t, 30);
+
+    char *name = input_dialog (_("Tab rename"), _("Please enter the new name:"), NULL, title,
+                               INPUT_COMPLETE_NONE);
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "rename");
+    if (name)
+    {
+        if (strlen (name))
+        {
+            t->name = g_new0 (char, strlen (name) + 1);
+            strcpy (t->name, name);
+            g_free (name);
+        }
+    }
+    widget_draw ((Widget *) p);
+}
+
+int
+get_tab_index (WPanel * p, GList * t)
+{
+    int result = 0;
+    GList *i = p->tabs.list;
+    do
+    {
+        if (i == t)
+        {
+            return result;
+        }
+        result++;
+        i = i->next;
+    }
+    while (i != p->tabs.list);
+
+    return 0;
+}
+
+/**
+ * This function goes to an arbitrary choosen tab
+ * @return void
+ */
+void
+goto_tab (WPanel * p)
+{
+    Listbox *listbox =
+        create_listbox_window (15, 60, _("Available Tabs"), "[Available Tabs Selector]");
+    GList *it = p->tabs.list;
+    int items = 0;
+    int result;
+
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "goto");
+    do
+    {
+        char *title = TAB_TITLE (p, it->data);
+        listbox_add_item (listbox->list, LISTBOX_APPEND_AT_END, 0, title, (void *) it, FALSE);
+        it = it->next;
+        items++;
+    }
+    while (it != p->tabs.list);
+
+    listbox_select_entry (listbox->list, get_tab_index (current_panel, p->tabs.current));
+
+    result = run_listbox (listbox);
+
+    if (result >= 0)
+    {
+        GList *t;
+        t = g_list_nth ((GList *) p->tabs.list, result);
+        change_tab (p, TABDIR_ABSOLUTE, t);
+    }
+}
+
+void
+create_tab (WPanel *p, TabsDirection_t direction, Tab *tab)
+{
+    GList *pTabListItem = NULL;
+    GList *newTabListItem = g_new0 (GList, 1);
+
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "create");
+    if (tab == NULL)
+    {
+        tab = g_new0 (Tab, 1);
+        tab->path = NULL;
+        tab->name = NULL;
+    }
+    newTabListItem->data = tab;
+
+    /* get the pointer of the target position */
+    if (direction == TABDIR_NEXT)
+    {
+        pTabListItem = p->tabs.current;
+    }
+    else if (direction == TABDIR_PREV)
+    {
+        pTabListItem = p->tabs.current->prev;
+    }
+    else if (direction == TABDIR_LAST || direction == TABDIR_FIRST)
+    {
+        pTabListItem = p->tabs.list ? p->tabs.list->prev : NULL;
+    }
+
+    /* tab list already exists */
+    if (pTabListItem)
+    {
+        GList *d = pTabListItem->next;
+        pTabListItem->next = newTabListItem;
+        newTabListItem->next = d;
+        d->prev = newTabListItem;
+        newTabListItem->prev = pTabListItem;
+    }
+    else
+    {
+        newTabListItem->next = newTabListItem;
+        newTabListItem->prev = newTabListItem;
+        p->tabs.current = newTabListItem;
+    }
+
+
+    if (!p->tabs.list || (direction == TABDIR_FIRST))
+    {
+        p->tabs.list = newTabListItem;
+    }
+}
+
+
+GList *
+get_tab_by_index (WPanel * p, int idx)
+{
+    int i = 0;
+    GList *t = p->tabs.list;
+
+    while (i++ < idx)
+    {
+        t = t->next;
+    }
+
+    return t;
+}
+
+RestoredTabs
+_restore_tabs (FILE * f)
+{
+    RestoredTabs result;
+    Tab *t;
+    int idx = 0;
+    int crt_idx;
+	int fscanf_items_read;
+    GList *i;
+    GList *j = NULL;
+    char *line = g_new0 (char, 1024);
+
+    result.error = 0;
+    result.list = NULL;
+    fscanf_items_read = fscanf (f, "%d\n%d\n", &result.idx, &crt_idx);
+
+    if ((crt_idx == -1) || (fscanf_items_read != 2))
+    {
+        return result;
+    }
+
+    do
+    {
+        read_line (line, 1024, f);
+        if (strcmp (line, "") && !feof (f))
+        {
+            t = g_new0 (Tab, 1);
+            if (!strcmp (line, "(null)"))
+            {
+                t->name = NULL;
+            }
+            else
+            {
+                t->name = g_new0 (char, strlen (line) + 1);
+                memcpy (t->name, line, strlen (line) + 1);
+            }
+
+            read_line (line, 1024, f);
+            if (!strcmp (line, ""))
+            {
+                result.error = 1;
+                return result;
+            }
+            t->path = vfs_path_from_str (line);
+
+            i = g_new0 (GList, 1);
+            i->data = (void *) t;
+
+            if (result.list == NULL)
+            {
+                result.list = i;
+                result.list->prev = result.list;
+                j = i;
+            }
+            i->next = result.list;
+            result.list->prev = i;
+            i->prev = j;
+            j->next = i;
+            j = i;
+
+            if (idx++ == crt_idx)
+            {
+                result.current = j;
+            }
+        }
+    }
+    while (!feof (f) && strcmp (line, "") && !result.error);
+
+    g_free (line);
+
+    return result;
+}
+
+void
+abort_restore (RestoredTabs restored)
+{
+    WPanel *tmp = g_new0 (WPanel, 1);
+    tmp->tabs.list = restored.list;
+    destroy_tabs (tmp);
+    message (D_ERROR, MSG_ERROR, _("Error restoring the tabs."));
+    g_free (tmp);
+}
+
+void
+read_line (char *line, int max, FILE * f)
+{
+	if (NULL != fgets (line, max, f))
+	{
+	    if (line[strlen (line) - 1] == '\n')
+	    {
+	        line[strlen (line) - 1] = '\0';
+	    }
+	}
+}
+void
+restore_tabs_session (char *title)
+{
+    char *file_name = g_new0 (char, strlen (tabs_options.sessions_folder) + 1 + strlen (title) + 1);
+    RestoredTabs restored1, restored2;
+    char *line = g_new0 (char, 1024);
+    Tab *t;
+
+    restored1.list = restored1.current = restored2.list = restored2.current = NULL;
+
+    sprintf (file_name, "%s/%s", tabs_options.sessions_folder, title);
+
+    if (exist_file (file_name))
+    {
+        FILE *f = fopen (file_name, "rt");
+        read_line (line, 1024, f);
+        if (strcmp (line, "[Current Panel]"))
+        {
+            abort_restore (restored1);
+            g_free (line);
+            g_free (file_name);
+            return;
+        }
+
+        restored1 = _restore_tabs (f);
+        if (restored1.error)
+        {
+            abort_restore (restored1);
+            g_free (line);
+            g_free (file_name);
+            return;
+        }
+        read_line (line, 1024, f);
+        if (strcmp (line, "[Other Panel]"))
+        {
+            abort_restore (restored1);
+            g_free (line);
+            g_free (file_name);
+            return;
+        }
+        restored2 = _restore_tabs (f);
+        if (restored2.error)
+        {
+            abort_restore (restored1);
+            abort_restore (restored2);
+            g_free (line);
+            g_free (file_name);
+            return;
+        }
+
+        fclose (f);
+        log4c(log4ccat, LOG4C_PRIORITY_INFO, "Index: %d ; %d ;",get_current_index (), get_other_index ());
+        log4c(log4ccat, LOG4C_PRIORITY_INFO, "Paneltype:  %du ; %du ;",get_panel_type (get_current_index ()), get_panel_type (get_other_index ()));
+        if (restored1.list && (get_panel_type (get_current_index ()) == view_listing))
+        {
+            destroy_tabs (current_panel);
+            current_panel->tabs.list = restored1.list;
+            current_panel->tabs.current = restored1.current;
+
+            t = (Tab *) current_panel->tabs.current->data;
+            do_panel_cd (current_panel, t->path, cd_exact);
+
+        }
+        if (restored2.list && (get_panel_type (get_other_index ()) == view_listing))
+        {
+            destroy_tabs (other_panel);
+            other_panel->tabs.list = restored2.list;
+            other_panel->tabs.current = restored2.current;
+            t = (Tab *) other_panel->tabs.current->data;
+            do_panel_cd (other_panel, t->path, cd_exact);
+        }
+
+        if (get_current_index () != restored1.idx)
+        {
+            //swap_panels ();
+            if (restored1.idx != 0)
+            {
+                //change_panel();
+            }
+        }
+    }
+    g_free (line);
+    g_free (file_name);
+}
+
+void
+_write_tabs (FILE * f, WPanel * p)
+{
+    GList *i = p->tabs.list;
+    Tab *t;
+    int crt = get_tab_index (p, p->tabs.current);
+
+    fprintf (f, "%d\n", crt);
+    do
+    {
+        t = (Tab *) i->data;
+        fprintf (f, "%s\n%s\n", t->name ? t->name : "(null)",
+                 vfs_path_as_str (i == p->tabs.current ? p->cwd_vpath : t->path));
+        i = i->next;
+    }
+    while (i != p->tabs.list);
+}
+
+void
+save_tabs_session (char *title)
+{
+    char *file_name = g_new0 (char, strlen (tabs_options.sessions_folder) + 1 + strlen (title) + 1);
+    FILE *f;
+    panel_view_mode_t t;
+    int i;
+    sprintf (file_name, "%s/%s", tabs_options.sessions_folder, title);
+
+    f = fopen (file_name, "wt");
+
+    i = get_current_index ();
+    t = get_panel_type (i);
+    fprintf (f, "[Current Panel]\n%d\n", i);
+    if (t == view_listing)
+    {
+        _write_tabs (f, current_panel);
+    }
+    else
+    {
+        fprintf (f, "-1\n");
+    }
+    i = get_other_index ();
+    t = get_panel_type (i);
+    fprintf (f, "\n[Other Panel]\n%d\n", i);
+    if (t == view_listing)
+    {
+        _write_tabs (f, other_panel);
+    }
+    else
+    {
+        fprintf (f, "-1\n");
+    }
+    fclose (f);
+    g_free (file_name);
+}
+void
+save_tabs_session_custom (void)
+{
+    char *name =
+        input_dialog (_("Save custom tabs session"), _("Please enter the session name:"), NULL, "",
+                      INPUT_COMPLETE_NONE);
+    if (name)
+    {
+        if (strlen (name))
+        {
+            save_tabs_session (name);
+        }
+
+        g_free (name);
+    }
+}
+
+void
+restore_tabs_session_custom (void)
+{
+    Listbox *listbox =
+        create_listbox_window (15, 60, _("Available Sessions"), "[Available Sessions Selector]");
+    struct dirent *entry;
+    DIR *dir;
+    char *name;
+    GList *items, *last, *current;
+    int result;
+    GList *t;
+    GList *i;
+
+    dir = opendir (tabs_options.sessions_folder);
+
+    items = NULL;
+
+    while ((entry = readdir (dir)) != NULL)
+    {
+        if (strcmp (entry->d_name, ".") && strcmp (entry->d_name, ".."))
+        {
+            name = g_new0 (char, 255);
+            memmove (name, entry->d_name, strlen (entry->d_name) + 1);
+            last = g_new0 (GList, 1);
+            last->data = name;
+            last->next = NULL;
+            if (items == NULL)
+            {
+                items = last;
+                current = last;
+            }
+            else
+            {
+                current->next = last;
+            }
+            current = last;
+            listbox_add_item (listbox->list, LISTBOX_APPEND_AT_END, 0, entry->d_name,
+                              (void *) name, FALSE);
+        }
+    }
+
+    result = run_listbox (listbox);
+
+    if (result >= 0)
+    {
+        t = g_list_nth ((GList *) items, result);
+        restore_tabs_session ((char *) t->data);
+    }
+
+    i = items;
+    while (i)
+    {
+        name = (char *) i->data;
+        i = i->next;
+        g_free (name);
+    }
+}
+
+void
+change_tab (WPanel * p, TabsDirection_t d, GList * tab)
+{
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "change");
+    if (p->tabs.current)
+    {
+        Tab *t = (Tab *) p->tabs.current->data;
+        if (t->path)
+        {
+            vfs_path_free (t->path);
+        }
+
+        //t->path = (vfs_path_t *) g_memdup(p->cwd_vpath, sizeof(vfs_path_t));
+        t->path = vfs_path_clone (p->cwd_vpath);
+
+        if (d == TABDIR_NEXT)
+        {
+            p->tabs.current = p->tabs.current->next;
+        }
+        else if (d == TABDIR_PREV)
+        {
+            p->tabs.current = p->tabs.current->prev;
+        }
+        else if (d == TABDIR_FIRST)
+        {
+            p->tabs.current = p->tabs.list;
+        }
+        else if (d == TABDIR_LAST)
+        {
+            p->tabs.current = p->tabs.list->prev;
+        }
+        else if (tab != NULL)
+        {
+            p->tabs.current = tab;
+        }
+
+        t = (Tab *) p->tabs.current->data;
+        if (t->path)
+        {
+            do_panel_cd (p, t->path, cd_exact);
+        }
+    }
+}
+
+void
+destroy_tab (Tab * t)
+{
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "destroy");
+    if (t->path)
+    {
+        vfs_path_free (t->path);
+    }
+    if (t->name)
+    {
+        g_free (t->name);
+    }
+    g_free (t);
+}
+
+void
+destroy_tabs (WPanel * p)
+{
+    GList *i;
+    Tab *t;
+    int loop;
+    if (p->tabs.list == NULL || p->tabs.do_not_delete)
+    {
+        saved_tabs = p->tabs.list;
+        p->tabs.do_not_delete = 0;
+        return;
+    }
+    loop = p->tabs.list != p->tabs.list->next;
+    p->tabs.list->prev->next = NULL;
+    do
+    {
+        i = p->tabs.list;
+        if (i)
+        {
+            t = (Tab *) i->data;
+            p->tabs.list = p->tabs.list->next;
+            destroy_tab (t);
+            g_free (i);
+        }
+    }
+    while (p->tabs.list && loop);
+    p->tabs.list = NULL;
+    p->tabs.current = NULL;
+}
+
+int
+draw_tab (char *title, int selected)
+{
+    if (selected)
+    {
+        tty_setcolor (SELECTED_COLOR);
+    }
+    tty_print_string (" ");
+    tty_print_string (title);
+    tty_print_string (" ");
+    tty_setcolor (NORMAL_COLOR);
+    tty_print_one_vline (TRUE);
+
+    return strlen (title) + 3;
+}
+
+void
+cut_title (char *title, int max)
+{
+    title[max] = '\0';
+    title[max - 1] = '.';
+    title[max - 2] = '.';
+    title[max - 3] = '.';
+}
+
+void TabMarkActive(WPanel * p, Tab * t, char *result);
+
+void TabMarkActive(WPanel * p, Tab * t, char *result)
+{
+    if (HIGHLIGHT_TAB)
+    {
+        strcat (result, "*");
+    }
+    else
+    {
+        strcat (result, " ");
+    }
+}
+
+char *
+get_tab_title (WPanel * p, Tab * t, unsigned int max)
+{
+    char *result = g_new0 (char, 255);
+    vfs_path_t *path;
+    size_t c;
+    Widget *w = (Widget *) p;
+
+    if ( (max > (unsigned int) w->cols - 5) || (max == 0))
+    {
+        max = w->cols - 5;
+    }
+    //for highlight * or space
+    max -= 1;
+
+    /* check if name was already set */
+    if (t->name)
+    {
+
+        log4c(log4ccat, LOG4C_PRIORITY_INFO, "Tabname: %s",t->name);
+        strncpy (result, t->name, max);
+        if (max != 0 && strlen (t->name) > max)
+        {
+            cut_title (result, max);
+        }
+        TabMarkActive(p, t, result);
+        return result;
+    }
+
+    if (t != p->tabs.current->data)
+    {
+        if (!t->path)
+        {
+            strcpy (result, "Error");
+            return result;
+        }
+        path = t->path;
+    }
+    else
+    {
+        path = p->cwd_vpath;
+    }
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "TabPath: %s",path->str);
+    c = vfs_path_tokens_count (path);
+    if (c == 0)
+    {
+        strcpy (result, "/");
+        TabMarkActive(p, t, result);
+        log4c(log4ccat, LOG4C_PRIORITY_INFO, "TabPath_Empty: %s",result);
+        return result;
+    }
+
+    g_free (result);
+
+
+    result = vfs_path_tokens_get (path, c - 1, 1);
+    if (max != 0 && strlen (result) > max)
+    {
+        cut_title (result, max);
+    }
+    TabMarkActive(p, t, result);
+    return result;
+}
+
+TabDisplayInfo *
+display_info (WPanel * p, Widget * w)
+{
+    int max_length = w->cols - 2;
+    TabDisplayInfo *result = g_new0 (TabDisplayInfo, 1);
+    GList *i;
+    int length = 0, dir = -1;
+    char *title;
+    char *buffer, *current = NULL, *j, *k;
+
+    result->start_tab = result->end_tab = p->tabs.current;
+    result->start_idx = 0;
+    result->end_idx = -1;
+    result->scroll = NO_SCROLL;
+
+    if (p->tabs.list->next == p->tabs.list)
+    {
+        return result;
+    }
+
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "");
+    i = p->tabs.list;
+    do
+    {
+        title = TAB_TITLE (p, i->data);
+        length += strlen (title) + 3;
+        g_free (title);
+        i = i->next;
+    }
+    while (i != p->tabs.list);
+
+    i = p->tabs.list;
+    buffer = g_new0 (char, length);
+
+    i = p->tabs.list;
+    j = buffer;
+    do
+    {
+        title = TAB_TITLE (p, i->data);
+        if (p->tabs.current == i)
+        {
+            current = j;
+        }
+        k = g_new0 (char, 2 + strlen (title));
+        strcpy (k, " ");
+        strcat (k, title);
+        strcpy (title, k);
+        strcat (title, " ");
+        memcpy (j, title, strlen (title));
+        g_free (k);
+        j += strlen (title);
+        j[0] = 0;
+        j++;
+        g_free (title);
+        i = i->next;
+    }
+    while (i != p->tabs.list);
+
+    length = strlen (current) + 3;
+    j = current;
+    k = current + strlen (j);
+
+    while (length < max_length)
+    {
+        if (dir == -1)
+        {
+            if (j != buffer)
+            {
+                length++;
+                j--;
+                if (*j == 0)
+                {
+                    result->start_tab = result->start_tab->prev;
+                }
+            }
+        }
+        else if (dir == 1)
+        {
+            if (*k != 0 || result->end_tab->next != p->tabs.list)
+            {
+                if (*k == 0)
+                {
+                    result->end_tab = result->end_tab->next;
+                }
+                k++;
+                length++;
+            }
+        }
+
+        dir *= -1;
+
+        if (j == buffer && *k == 0 && result->end_tab->next == p->tabs.list)
+        {
+            break;
+        }
+    }
+
+    if (*j == 0)
+    {
+        result->start_idx = 0;
+        if (result->start_tab != result->end_tab)
+        {
+            result->start_tab = result->start_tab->next;
+        }
+    }
+    else
+    {
+        title = TAB_TITLE (p, result->start_tab->data);
+        if (strcmp (j, " ") == 0)
+        {
+            result->start_idx = strlen (title) - 1;
+        }
+        else
+        {
+            result->start_idx = strlen (title) - strlen (j) + 1;
+            if (strlen (title) == strlen (j) - 1 && result->start_tab != p->tabs.list)
+            {
+                result->scroll = result->scroll | SCROLL_LEFT;
+            }
+        }
+        g_free (title);
+    }
+
+    if (*k == 0)
+    {
+        result->end_idx = -1;
+    }
+    else
+    {
+        title = TAB_TITLE (p, result->end_tab->data);
+        if (strcmp (k, " ") == 0)
+        {
+            result->end_idx = strlen (title);
+            result->scroll = result->scroll | SCROLL_RIGHT;
+        }
+        else
+        {
+            result->end_idx = strlen (title) - strlen (k) + 1;
+            if (result->end_idx < 0)
+            {
+                result->end_idx = 0;
+            }
+        }
+        g_free (title);
+    }
+
+    if (result->start_tab != p->tabs.list || result->start_idx > 0)
+    {
+        result->scroll = result->scroll | SCROLL_LEFT;
+    }
+
+    if (result->end_tab->next != p->tabs.list || result->end_idx != -1)
+    {
+        result->scroll = result->scroll | SCROLL_RIGHT;
+    }
+
+    g_free (buffer);
+
+    return result;
+}
+
+void
+draw_tabs (WPanel * panel)
+{
+    WPanel *p = (panel == NULL ? current_panel : panel);
+    Widget *w;
+    char *title;
+    int x, y, length;
+    GList *i;
+    TabDisplayInfo *info;
+
+    do
+    {
+        // if (current_panel->frame_size == frame_full && p != current_panel){
+        //     break;
+        // }
+        if (TABS_VISIBLE (p))
+        {
+            if (p->tabs.list == NULL)
+            {
+                break;
+            }
+            tty_setcolor (NORMAL_COLOR);
+            w = (Widget *) p;
+
+            x = w->x + 1;
+            log4c(log4ccat, LOG4C_PRIORITY_INFO, "");
+            if (!TABS_UP (p))
+            {
+                y = w->y + w->lines - 3;        //w->lines - (the_menubar->is_visible ? 2 : 3);
+                tty_draw_hline (y, x, ACS_HLINE, w->cols - 2);
+                tty_gotoyx (y, w->x);
+                tty_print_alt_char (ACS_LTEE, FALSE);
+                tty_gotoyx (y, w->x + w->cols - 1);
+                tty_print_alt_char (ACS_RTEE, FALSE);
+                tty_gotoyx (y + 1, x);
+            }
+            else
+            {
+                y = w->y;
+                tty_draw_hline (y + 1, x, ACS_HLINE, w->cols - 2);
+                tty_draw_hline (y + 3, x, ACS_HLINE, w->cols - 2);
+                tty_gotoyx (y + 1, w->x);
+                tty_print_alt_char (ACS_LTEE, FALSE);
+                tty_gotoyx (y + 1, w->x + w->cols - 1);
+                tty_print_alt_char (ACS_RTEE, FALSE);
+                tty_gotoyx (y + 3, w->x);
+                tty_print_alt_char (ACS_LTEE, FALSE);
+                tty_gotoyx (y + 3, w->x + w->cols - 1);
+                tty_print_alt_char (ACS_RTEE, FALSE);
+                tty_gotoyx (y + 2, x);
+            }
+            length = w->cols - 2;
+            info = display_info (p, w);
+            i = info->start_tab;
+            if (i)
+            {
+                do
+                {
+                    title = TAB_TITLE (p, i->data);
+                    if (i == info->start_tab && info->start_idx != 0)
+                    {
+                        int l = strlen (title) - info->start_idx;
+                        char *title2 = g_new0 (char, l + 1);
+                        memcpy (title2, title + info->start_idx, l + 1);
+                        memcpy (title, title2, strlen (title2));
+                        title[l] = '\0';
+                        g_free (title2);
+                    }
+                    if (i == info->end_tab && info->end_idx != -1)
+                    {
+                        title[info->end_idx] = '\0';
+                    }
+                    if (*title != 0)
+                    {
+                        length -= draw_tab (title, i == p->tabs.current && p == current_panel);
+                    }
+                    g_free (title);
+                    i = i->next;
+                }
+                while (i != info->end_tab->next);
+            }
+            g_free (info);
+
+            tty_print_string (str_fit_to_term (" ", length, J_LEFT));
+
+            // Draw the scroll signs
+            if ((info->scroll & SCROLL_LEFT) == SCROLL_LEFT)
+            {
+                tty_gotoyx ((TABS_UP (p) ? w->y + 2 : w->lines - 1), w->x + 1);
+                tty_print_string (panel_history_prev_item_char);
+            }
+
+            if ((info->scroll & SCROLL_RIGHT) == SCROLL_RIGHT)
+            {
+                tty_gotoyx ((TABS_UP (p) ? w->y + 2 : w->lines - 1), w->x + w->cols - 2);
+                tty_print_string (panel_history_next_item_char);
+            }
+        }
+
+        if (panel != NULL)
+        {
+            break;
+        }
+
+        if (p == other_panel)
+        {
+            p = NULL;
+        }
+        else
+        {
+            p = other_panel;
+        }
+    }
+    while (p);
+}
+
+void
+hide_tabs (void)
+{
+    WPanel *p = current_panel;
+    Widget *w = WIDGET (p);
+
+    int x = w->x + 1, y = w->lines - (the_menubar->is_visible ? 2 : 3);
+
+    tty_gotoyx (y, x);
+    tty_print_string (str_fit_to_term (" ", w->cols - 2, J_LEFT));
+    tty_gotoyx (y + 1, x);
+    tty_print_string (str_fit_to_term (" ", w->cols - 2, J_LEFT));
+}
+
+/*
+ * Processes a click on the tabbar
+ */
+void
+process_tab_click (unsigned int x)
+{
+    Widget *w = (Widget *) current_panel;
+    TabDisplayInfo *info = display_info (current_panel, w);
+    GList *i;
+    char *title, *j;
+    unsigned int n;
+
+    log4c(log4ccat, LOG4C_PRIORITY_INFO, "event_x = %u", x);
+
+    if (x == 2 && ((info->scroll & SCROLL_LEFT) == SCROLL_LEFT))
+    {
+        change_tab (current_panel, TABDIR_PREV, NULL);
+    }
+    else if (x == (unsigned int) (w->cols - 1) && ((info->scroll & SCROLL_RIGHT) == SCROLL_RIGHT))
+    {
+        change_tab (current_panel, TABDIR_NEXT, NULL);
+    }
+    else
+    {
+        n = 2;
+        for (i = info->start_tab; i != info->end_tab; i = i->next)
+        {
+            title = TAB_TITLE (current_panel, i->data);
+            if (!title)
+            {
+                strcpy(title, ((Tab *)i->data)->path->str);
+            }
+            j = title;
+            log4c(log4ccat, LOG4C_PRIORITY_INFO, "Local title: %s ; Title: %s ; Path: %s", title, ((Tab *)i->data)->name, ((Tab *)i->data)->path->str);
+            if (i == info->start_tab && info->start_idx != 0)
+            {
+                j = title + info->start_idx;
+            }
+            log4c(log4ccat, LOG4C_PRIORITY_INFO, "title = %s ; start_idx = %d", j, info->start_idx);
+            if (x < strlen (j) + 2 + n)
+            {
+                g_free (title);
+                break;
+            }
+
+            n += strlen (j) + 3;
+            g_free (title);
+        }
+
+        change_tab (current_panel, TABDIR_ABSOLUTE, i);
+    }
+    g_free (info);
+}
+
+#if 0
+void
+move_tab (WPanel * p, TabsDirection_t d)
+{
+    gpointer i;
+    if (p->tabs.list == p->tabs.list->next)
+    {
+        return;
+    }
+
+    if (d == TABDIR_PREV && p->tabs.current == p->tabs.list)
+    {
+        p->tabs.list = p->tabs.list->next;
+        draw_tabs (p);
+        return;
+    }
+
+    if (d == TABDIR_NEXT && p->tabs.current->next == p->tabs.list)
+    {
+        p->tabs.list = p->tabs.current;
+        draw_tabs (p);
+        return;
+    }
+
+    change_tab (p, TABDIR_ABSOLUTE, p->tabs.current);
+    i = p->tabs.current->data;
+    if (d == TABDIR_NEXT)
+    {
+        p->tabs.current->data = p->tabs.current->next->data;
+        p->tabs.current->next->data = i;
+    }
+    else
+    {
+        p->tabs.current->data = p->tabs.current->prev->data;
+        p->tabs.current->prev->data = i;
+    }
+
+    do_panel_cd (p, ((Tab *) p->tabs.current->data)->path, cd_exact);
+    change_tab (p, d, NULL);
+    draw_tabs (p);
+}
+#endif
 /* --------------------------------------------------------------------------------------------- */

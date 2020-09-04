@@ -228,6 +228,17 @@ create_panel_menu (void)
     entries = g_list_prepend (entries, menu_separator_create ());
     entries = g_list_prepend (entries, menu_entry_create (_("&Rescan"), CK_Reread));
 
+#ifdef WITH_TABS
+    entries = g_list_prepend (entries, menu_separator_create ());
+    entries = g_list_prepend (entries, menu_entry_create (_("&Create tab"), CK_CreateTab));
+    entries = g_list_prepend (entries, menu_entry_create (_("Cl&ose tab"), CK_CloseTab));
+    entries = g_list_prepend (entries, menu_entry_create (_("Re&name tab"), CK_RenameTab));
+    entries = g_list_prepend (entries, menu_entry_create (_("Ne&xt tab"), CK_NextTab));
+    entries = g_list_prepend (entries, menu_entry_create (_("Pre&vious tab"), CK_PreviousTab));
+    entries = g_list_prepend (entries, menu_entry_create (_("&Move tab left"), CK_MoveTabLeft));
+    entries = g_list_prepend (entries, menu_entry_create (_("Move tab ri&ght"), CK_MoveTabRight));
+    entries = g_list_prepend (entries, menu_entry_create (_("Go to ta&b"), CK_GoToTab));
+#endif
     return g_list_reverse (entries);
 }
 
@@ -294,6 +305,14 @@ create_command_menu (void)
     entries =
         g_list_prepend (entries, menu_entry_create (_("E&xternal panelize"), CK_ExternalPanelize));
     entries = g_list_prepend (entries, menu_entry_create (_("Show directory s&izes"), CK_DirSize));
+#ifdef WITH_TABS
+    entries = g_list_prepend (entries, menu_separator_create ());
+    entries =
+        g_list_prepend (entries, menu_entry_create (_("Move tab to the other pane&l"), CK_MoveTab));
+    entries =
+        g_list_prepend (entries, menu_entry_create (_("Copy tab to the other pa&nel"), CK_CopyTab));
+    entries = g_list_prepend (entries, menu_entry_create (_("&Swap tabs"), CK_SwapTab));
+#endif
     entries = g_list_prepend (entries, menu_separator_create ());
     entries = g_list_prepend (entries, menu_entry_create (_("Command &history"), CK_History));
     entries =
@@ -342,6 +361,9 @@ create_options_menu (void)
     entries = g_list_prepend (entries, menu_entry_create (_("&Configuration..."), CK_Options));
     entries = g_list_prepend (entries, menu_entry_create (_("&Layout..."), CK_OptionsLayout));
     entries = g_list_prepend (entries, menu_entry_create (_("&Panel options..."), CK_OptionsPanel));
+#ifdef WITH_TABS
+    entries = g_list_prepend (entries, menu_entry_create (_("&Tabs options..."), CK_TabsOptions));
+#endif
     entries =
         g_list_prepend (entries, menu_entry_create (_("C&onfirmation..."), CK_OptionsConfirm));
     entries =
@@ -354,6 +376,13 @@ create_options_menu (void)
 #endif
     entries = g_list_prepend (entries, menu_separator_create ());
     entries = g_list_prepend (entries, menu_entry_create (_("&Save setup"), CK_SaveSetup));
+#ifdef WITH_TABS
+    entries =
+        g_list_prepend (entries, menu_entry_create (_("Save tabs sessio&n"), CK_TabsSaveSession));
+    entries =
+        g_list_prepend (entries,
+                        menu_entry_create (_("Restore tabs sessi&on"), CK_TabsRestoreSession));
+#endif
 
     return g_list_reverse (entries);
 }
@@ -948,6 +977,16 @@ create_file_manager (void)
     the_bar = buttonbar_new (mc_global.keybar_visible);
     group_add_widget (g, the_bar);
     midnight_set_buttonbar (the_bar);
+#ifdef WITH_TABS
+    saved_tabs = NULL;
+    if (tabs_options.restore_on_load)
+    {
+        char *title = g_new0 (char, 255);
+        strcpy (title, "default");
+        restore_tabs_session (title);
+        g_free (title);
+    }
+#endif
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1329,6 +1368,54 @@ midnight_execute_cmd (Widget * sender, long command)
     case CK_OptionsPanel:
         panel_options_box ();
         break;
+#ifdef WITH_TABS
+    case CK_TabsOptions:
+        tabs_options_box ();
+        break;
+    case CK_TabsSaveSession:
+        //svlu2312
+        save_tabs_session_custom ();
+        break;
+    case CK_TabsRestoreSession:
+        //svlu2312
+        restore_tabs_session_custom ();
+        break;
+    case CK_CreateTab:
+        new_tab (TARGET_PANEL);
+        break;
+    case CK_CloseTab:
+        close_tab (TARGET_PANEL);
+        break;
+    case CK_RenameTab:
+        rename_tab (TARGET_PANEL);
+        break;
+    case CK_NextTab:
+        // If the sender if the menu bar, then do next tab in the corresponding menu panel.
+        // Otherwise, do it in the current panel (-1)
+        change_tab (TARGET_PANEL, TABDIR_NEXT, NULL);
+        break;
+    case CK_CopyTab:
+        //copy_tab_to_other_panel ();
+        break;
+    case CK_MoveTabLeft:
+        //move_tab (TARGET_PANEL, TABDIR_PREV);
+        break;
+    case CK_MoveTabRight:
+        //move_tab (TARGET_PANEL, TABDIR_NEXT);
+        break;
+    case CK_SwapTab:
+        //swap_tabs ();
+        break;
+    case CK_MoveTab:
+        //move_tab_to_other_panel ();
+        break;
+    case CK_PreviousTab:
+        change_tab (TARGET_PANEL, TABDIR_PREV, NULL);
+        break;
+    case CK_GoToTab:
+        goto_tab (TARGET_PANEL);
+        break;
+#endif
 #ifdef HAVE_CHARSET
     case CK_SelectCodepage:
         encoding_cmd ();
@@ -1813,6 +1900,9 @@ do_nc (void)
 {
     gboolean ret;
 
+#ifdef WITH_TABS
+    char *title = g_new0 (char, 255);
+#endif
 #ifdef USE_INTERNAL_EDIT
     edit_stack_init ();
 #endif
@@ -1853,6 +1943,11 @@ do_nc (void)
 
     /* Program end */
     mc_global.midnight_shutdown = TRUE;
+#ifdef WITH_TABS
+    strcpy (title, "default");
+    save_tabs_session (title);
+    g_free (title);
+#endif
     dialog_switch_shutdown ();
     done_mc ();
     dlg_destroy (midnight_dlg);

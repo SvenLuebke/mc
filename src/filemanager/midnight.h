@@ -14,6 +14,9 @@
 
 /*** typedefs(not structures) and defined constants **********************************************/
 
+#ifdef WITH_TABS
+#define TARGET_PANEL get_target_panel(sender == WIDGET (the_menubar) ? MENU_PANEL_IDX : -1)
+#endif
 #define MENU_PANEL (mc_global.widget.is_right ? right_panel : left_panel)
 #define MENU_PANEL_IDX  (mc_global.widget.is_right ? 1 : 0)
 #define SELECTED_IS_PANEL (get_panel_type (MENU_PANEL_IDX) == view_listing)

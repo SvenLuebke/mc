@@ -1141,6 +1141,15 @@ create_panel (int num, panel_view_mode_t type)
                     x = panels_layout.left_panel_size;
             }
         }
+#ifdef WITH_TABS
+        if (old_type == view_listing)
+        {
+            Widget *_w = panels[num].widget;
+            WPanel *_p = PANEL (_w);
+            _p->tabs.do_not_delete = 1;
+            change_tab (_p, TABDIR_ABSOLUTE, _p->tabs.list);
+        }
+#endif
     }
 
     /* Restoring saved path from panels.ini for nonlist panel */
@@ -1275,6 +1284,10 @@ swap_panels (void)
         panelswap (selected);
         panelswap (is_panelized);
         panelswap (dir_stat);
+#ifdef WITH_TABS
+        panelswap (tabs.list);
+        panelswap (tabs.current);
+#endif
 #undef panelswap
 
         panel1->searching = FALSE;
@@ -1554,5 +1567,18 @@ update_xterm_title_path (void)
         (void) fflush (stdout);
     }
 }
+
+#ifdef WITH_TABS
+WPanel *
+get_target_panel (int menu)
+{
+    WPanel *p = PANEL (panels[menu].widget);
+    if (menu == -1)
+    {
+        return current_panel;
+    }
+    return p;
+}
+#endif
 
 /* --------------------------------------------------------------------------------------------- */

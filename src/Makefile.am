@@ -26,7 +26,8 @@ SUBDIRS += consaver
 AM_CPPFLAGS += -DSAVERDIR=\""$(pkglibexecdir)"\"
 endif
 
-AM_CPPFLAGS += -I$(top_srcdir) $(GLIB_CFLAGS)
+AM_CPPFLAGS += -I$(top_srcdir) @log4c_CFLAGS@ $(GLIB_CFLAGS)
+mc_LDFLAGS = @log4c_LIBS@
 
 localedir = $(datadir)/locale
 pkglibexecdir = $(libexecdir)/@PACKAGE@

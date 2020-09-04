@@ -750,6 +750,55 @@ panel_options_box (void)
     update_panels (UP_RELOAD, UP_KEEPSEL);
 }
 
+#ifdef WITH_TABS
+void
+tabs_options_box (void)
+{
+    const char *open_where_options[] = {
+        N_("&Before current tab"),
+        N_("&After current tab"),
+        N_("At &end of tab bar"),
+        N_("At be&ginning of tab bar")
+    };
+
+    const char *bar_position_options[] = {
+        N_("&Top"),
+        N_("&Bottom")
+    };
+
+    {
+        quick_widget_t quick_widgets[] = {
+            /* *INDENT-OFF* */
+            QUICK_START_GROUPBOX (N_("Open tabs")),
+                QUICK_RADIO (TABS_NUM, open_where_options, (int *) &tabs_options.open_where,
+                             NULL),
+            QUICK_STOP_GROUPBOX,
+            QUICK_START_GROUPBOX (N_("Tabs bar position")),
+                QUICK_RADIO (POS_NUM, bar_position_options, (int *) &tabs_options.bar_position,
+                             NULL),
+            QUICK_STOP_GROUPBOX,
+            QUICK_CHECKBOX (N_("H&ighlight current tab in the other panel"), &tabs_options.highlight_current_tab, NULL),
+            QUICK_CHECKBOX (N_("&Hide tab bar if only one tab"), &tabs_options.hide_tabs, NULL),
+            QUICK_CHECKBOX (N_("&Restore tabs when starting"), &tabs_options.restore_on_load, NULL),
+            QUICK_BUTTONS_OK_CANCEL,
+            QUICK_END
+            /* *INDENT-ON* */
+        };
+
+        quick_dialog_t qdlg = {
+            -1, -1, 60,
+            N_("Tabs options"), "[Tabs options]",
+            quick_widgets, NULL, NULL
+        };
+
+        if (quick_dialog (&qdlg) != B_ENTER)
+            return;
+    }
+	//set_panel_dirbox_yoffset()
+    update_panels (UP_RELOAD, UP_KEEPSEL);
+}
+#endif
+
 /* --------------------------------------------------------------------------------------------- */
 
 /* return list type */

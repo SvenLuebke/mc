@@ -18,6 +18,19 @@
 
 /*** typedefs(not structures) and defined constants **********************************************/
 
+#ifdef WITH_TABS
+#define TABS_UP_TABSVLINE   2
+
+#define TABS_UP_VLINES   3
+#define TABS_BOTTOM_VLINES   2
+
+#define MAX_TAB_TITLE 30        /* 0 means full title */
+#define TABS_VISIBLE(p) (((p->tabs.list->next != p->tabs.list) || !tabs_options.hide_tabs) && ((current_panel->list_format != list_long && other_panel->list_format != list_long) || p == current_panel))
+#define TABS_UP(p) (tabs_options.bar_position == TOP && TABS_VISIBLE(p))
+#define HIGHLIGHT_TAB (t == p->tabs.current->data && p != current_panel && tabs_options.highlight_current_tab)
+#define TAB_TITLE(p, tab) get_tab_title(p, (Tab *) tab, MAX_TAB_TITLE)
+#endif
+
 #define PANEL(x) ((WPanel *)(x))
 #define selection(p) (&(p->dir.list[p->selected]))
 #define DEFAULT_USER_FORMAT "half type name | size | perm"
@@ -27,6 +40,25 @@
 #define UP_KEEPSEL ((char *) -1)
 
 /*** enums ***************************************************************************************/
+
+#ifdef WITH_TABS
+typedef enum
+{
+    TABDIR_NEXT,
+    TABDIR_PREV,
+    TABDIR_FIRST,
+    TABDIR_LAST,
+    TABDIR_ABSOLUTE
+} TabsDirection_t;
+
+enum tabs_scroll_flags
+{
+    NO_SCROLL = 0,
+    SCROLL_LEFT = 1,
+    SCROLL_RIGHT = 2,
+    SCROLL_BOTH = 3
+};
+#endif
 
 typedef enum
 {
@@ -67,6 +99,39 @@ enum cd_enum
 
 /*** structures declarations (and typedefs of structures)*****************************************/
 
+#ifdef WITH_TABS
+typedef struct TabDisplayInfo
+{
+    GList *start_tab;
+    GList *end_tab;
+    int start_idx, end_idx;
+    enum tabs_scroll_flags scroll;
+} TabDisplayInfo;
+
+typedef struct Tab
+{
+    char *name;
+    vfs_path_t *path;
+} Tab;
+
+typedef struct TabsInfo
+{
+    GList *list;
+    GList *current;
+    int do_not_delete;
+} TabsInfo;
+
+typedef struct RestoredTabs
+{
+    GList *list;
+    GList *current;
+    int idx;
+    int error;
+} RestoredTabs;
+#endif
+
+struct format_e;
+
 typedef struct panel_field_struct
 {
     const char *id;
@@ -98,6 +163,9 @@ typedef struct
     vfs_path_t *lwd_vpath;      /* Last Working Directory */
     GList *dir_history;         /* directory history */
     GList *dir_history_current; /* pointer to the current history item */
+#ifdef WITH_TABS
+    TabsInfo tabs;
+#endif
     char *hist_name;            /* directory history name for history file */
     int marked;                 /* Count of marked files */
     int dirs_marked;            /* Count of marked directories */
@@ -147,11 +215,56 @@ extern hook_t *select_file_hook;
 
 extern mc_fhl_t *mc_filehighlight;
 
+#ifdef WITH_TABS
+extern GList *saved_tabs;
+#endif
+
 /*** declarations of public functions ************************************************************/
 
 WPanel *panel_sized_empty_new (const char *panel_name, int y, int x, int lines, int cols);
 WPanel *panel_sized_with_dir_new (const char *panel_name, int y, int x, int lines, int cols,
                                   const vfs_path_t * vpath);
+
+/*** declarations of public functions ************************************************************/
+
+#ifdef WITH_TABS
+/*Tabs functions */
+void draw_tabs (WPanel * panel);
+void hide_tabs (void);
+void create_tab (WPanel * p, TabsDirection_t d, Tab * t);
+void change_tab (WPanel * p, TabsDirection_t d,
+                 GList * tab /*used only for absolute direction */ );
+void destroy_tab (Tab * t);
+void destroy_tabs (WPanel * p);
+char *get_tab_title (WPanel * p, Tab * t, unsigned int max);
+void save_tabs_session (char *title);
+void restore_tabs_session (char *title);
+void move_tab_to_other_panel (void);
+void copy_tab_to_other_panel (void);
+void swap_tabs (void);
+void process_tab_click (unsigned int x);
+void move_tab (WPanel * p, TabsDirection_t d);
+
+TabsDirection_t get_new_tabs_direction (void);
+void new_tab (WPanel * panel);
+void close_tab (WPanel * p);
+void rename_tab (WPanel * p);
+int get_tab_index (WPanel * p, GList * t);
+GList *get_tab_by_index (WPanel * p, int idx);
+RestoredTabs _restore_tabs (FILE * f);
+void abort_restore (RestoredTabs restored);
+void save_tabs_session_custom (void);
+void restore_tabs_session_custom (void);
+void _write_tabs (FILE * f, WPanel * p);
+void read_line (char *line, int max, FILE * f);
+void goto_tab (WPanel * p);
+void cut_title (char *title, int max);
+TabDisplayInfo *display_info (WPanel * p, Widget * w);
+int draw_tab (char *title, int selected);
+
+void set_panel_dirbox_yoffset(int offset);
+/*End tabs functions */
+#endif
 
 void panel_clean_dir (WPanel * panel);
 

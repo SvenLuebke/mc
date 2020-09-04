@@ -69,6 +69,10 @@ panel_view_mode_t get_current_type (void);
 panel_view_mode_t get_other_type (void);
 int get_current_index (void);
 int get_other_index (void);
+#ifdef WITH_TABS
+WPanel *get_target_panel (int menu);
+#endif
+
 const char *get_nth_panel_name (int num);
 
 Widget *get_panel_widget (int idx);
